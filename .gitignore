@@ -2,3 +2,7 @@
 .gitattributes
 .idea/*
 tip_bot.running
+raffle_tip_bot_prod.cfg
+tip_bot.cfg
+usdc_tip_bot.cfg
+usdc_tip_bot_prod.cfg
