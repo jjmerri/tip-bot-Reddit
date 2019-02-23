@@ -5,7 +5,6 @@
 # =============================================================================
 import praw
 import re
-import MySQLdb
 from decimal import Decimal
 import configparser
 import logging
@@ -15,6 +14,7 @@ import sys
 from email.mime.text import MIMEText
 import smtplib
 from enum import Enum
+import tips_manager
 
 # =============================================================================
 # GLOBALS
@@ -36,11 +36,6 @@ reddit = praw.Reddit(client_id=client_id,
                      user_agent='Tip Bot by /u/BoyAndHisBlob',
                      username=bot_username)
 
-DB_USER = config.get("SQL", "user")
-DB_PASS = config.get("SQL", "passwd")
-DB_HOST = config.get("SQL", "host")
-DB_DATABASE = config.get("SQL", "database")
-
 ENVIRONMENT = config.get("TIP_BOT", "environment")
 DEV_EMAIL = config.get("TIP_BOT", "dev_email")
 DEV_USER_NAME = config.get("TIP_BOT", "dev_user")
@@ -56,7 +51,7 @@ logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('tip_bot')
 logger.setLevel(logging.INFO)
 
-documentation_link = "https://github.com/jjmerri/redditTipBot"
+documentation_link = "https://github.com/jjmerri/tip-bot-reddit"
 reply_footer = '\n\n---\n\n[^Account ^Info](https://www.reddit.com/message/compose/?to={bot_username}&subject=Account%20Info&message=!ACCOUNT) ^| [^Give ^Feedback](https://www.reddit.com/message/compose/?to={DEV_USER_NAME}&subject=Feedback) ^| [^Bot ^Info]({documentation_link}) ^| [^Tip ^Developer](https://blobware-tips.firebaseapp.com)\n\n^This ^bot ^is ^maintained ^and ^hosted ^by ^{DEV_USER_NAME}.' \
     .format(
     DEV_USER_NAME=DEV_USER_NAME,
@@ -64,7 +59,6 @@ reply_footer = '\n\n---\n\n[^Account ^Info](https://www.reddit.com/message/compo
     bot_username=bot_username
 )
 
-INITIAL_ACCOUNT_AMOUNT = 20
 
 
 # =============================================================================
@@ -84,21 +78,6 @@ class CommandType(Enum):
 class CommandRegex:
     send_tip_regex = r'/?u/{bot_username}[ ]+\+(?P<amount>([\d]*\.?[\d]+))'.format(bot_username=bot_username)
     account_info_regex = r'!account'
-
-
-class DbConnection(object):
-    """
-    DB connection class
-    """
-    connection = None
-    cursor = None
-
-    def __init__(self):
-        self.connection = MySQLdb.connect(
-            host=DB_HOST, user=DB_USER, passwd=DB_PASS, db=DB_DATABASE
-        )
-        self.cursor = self.connection.cursor(MySQLdb.cursors.DictCursor)
-
 
 def send_dev_pm(subject, body):
     """
@@ -165,10 +144,9 @@ def process_mention(mention):
                       "Example:\n\n    /u/{bot_username} +2{reply_footer}".format(bot_username=bot_username, reply_footer=reply_footer))
 
 def process_account_info_command(message):
-    account = get_account(message.author.name)
-    account_balance = account['balance']
-    total_sent = get_total_tips_sent(message.author.name)
-    total_received = get_total_tips_received(message.author.name)
+    account_balance = tips_manager.get_account_balance(message.author.name)
+    total_sent = tips_manager.get_total_tips_sent(message.author.name)
+    total_received = tips_manager.get_total_tips_received(message.author.name)
 
     message.reply('Account Balance: {account_balance}\n\n'
                   'Total Sent: {total_sent}\n\n'
@@ -187,8 +165,8 @@ def process_send_tip_command(mention):
     parentcomment = mention.parent()
 
     if parentcomment and parentcomment.author and mention.author and send_tip_match and send_tip_match.group("amount"):
-        initialize_account(parentcomment.author.name)
-        initialize_account(mention.author.name)
+        tips_manager.initialize_account(parentcomment.author.name)
+        tips_manager.initialize_account(mention.author.name)
         try_send_tip(mention, parentcomment.author.name, mention.author.name, Decimal(send_tip_match.group("amount")))
 
 
@@ -217,7 +195,7 @@ def try_send_tip(mention, to_user, from_user, amount):
                       )
         return
 
-    if send_tip(to_user, from_user, amount, mention.context):
+    if tips_manager.send_tip(to_user, from_user, amount, mention.context):
         mention.reply('Thanks {from_user}, you have sent **{amount}** TIPs to **{to_user}**.{reply_footer}'
             .format(
             to_user=to_user,
@@ -229,113 +207,6 @@ def try_send_tip(mention, to_user, from_user, amount):
         mention.reply('You do not have sufficient funds to send that tip. How embarrassing for you.{reply_footer}'
                         .format(reply_footer=reply_footer)
                     )
-
-def send_tip(to_user, from_user, amount, context):
-    """
-    sends a tip to to_user from from_user in the amount of amount
-    :param to_user: user receiveing the tip
-    :param from_user: user sending the tip
-    :param amount: amount of tip being sent
-    """
-    if not has_sufficient_funds(from_user, amount):
-        return False
-
-    from_account = get_account(from_user)
-    to_account = get_account(to_user)
-
-    from_account_balance = Decimal(from_account["balance"])
-    to_account_balance = Decimal(to_account["balance"])
-
-    db_connection = DbConnection()
-    update_account_query = "UPDATE account SET balance = %s WHERE username = %s"
-    db_connection.cursor.execute(update_account_query, [to_account_balance + amount, to_user])
-    db_connection.cursor.execute(update_account_query, [from_account_balance - amount, from_user])
-
-    tip_transaction_query = "INSERT INTO tip_transaction (to_acct_id, from_acct_id, amount, context) VALUES (%s, %s, %s, %s)"
-    db_connection.cursor.execute(tip_transaction_query, [to_account["acct_id"], from_account["acct_id"], amount, context])
-
-    db_connection.connection.commit()
-    db_connection.connection.close()
-
-    return True
-
-def has_sufficient_funds(username, amount):
-    """
-    Checks if the account owned by username has a balance >= amount
-    :param username: owner of the account
-    :param amount: the amount to check against the balance
-    :return true if the account balance is >= amount
-    """
-
-    account = get_account(username)
-    return account and Decimal(account["balance"]) >= Decimal(amount)
-
-def initialize_account(username):
-    """
-    If the account doesnt exist then create it with the default balance
-    :param username: username the account belongs to
-    """
-
-    account = get_account(username)
-
-    if not account:
-        db_connection = DbConnection()
-
-        query = "INSERT INTO account (username, balance) VALUES (%s, %s)"
-        db_connection.cursor.execute(query, [username, INITIAL_ACCOUNT_AMOUNT])
-
-        db_connection.connection.commit()
-        db_connection.connection.close()
-
-def get_account(username):
-    """
-    gets the user's account
-    :param username: the username elonging to the account that will be retrieved
-    :return: the account table row identified by the username
-    """
-    db_connection = DbConnection()
-    query = "SELECT * FROM account WHERE username = %s"
-    db_connection.cursor.execute(query, [username])
-    account = db_connection.cursor.fetchall()
-    db_connection.connection.close()
-
-    return account[0]
-
-def get_total_tips_sent(username):
-    """
-    gets the total amount of tips the user sent
-    :param username: the username we are getting the sent tips for
-    :return: total tips sent by username
-    """
-    db_connection = DbConnection()
-    query = "SELECT SUM(amount) as total FROM tip_transaction JOIN account on tip_transaction.from_acct_id = account.acct_id WHERE account.username = %s"
-    db_connection.cursor.execute(query, [username])
-    result = db_connection.cursor.fetchall()
-    db_connection.connection.close()
-
-    total = Decimal(0)
-    if result and result[0]['total']:
-        total = result[0]['total']
-
-    return total
-
-def get_total_tips_received(username):
-    """
-    gets the total amount of tips the user received
-    :param username: the username we are getting the tips received for
-    :return: total tips sent by username
-    """
-    db_connection = DbConnection()
-    query = "SELECT SUM(amount) as total FROM tip_transaction JOIN account on tip_transaction.to_acct_id = account.acct_id WHERE account.username = %s"
-    db_connection.cursor.execute(query, [username])
-    result = db_connection.cursor.fetchall()
-    db_connection.connection.close()
-
-    total = Decimal(0)
-    if result and result[0]['total']:
-        total = result[0]['total']
-
-    return total
 
 def get_command(mention_text):
     """
