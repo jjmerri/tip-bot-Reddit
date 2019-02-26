@@ -4,6 +4,7 @@
 # IMPORTS
 # =============================================================================
 import praw
+import datetime
 import re
 from decimal import Decimal
 import configparser
@@ -195,7 +196,7 @@ def try_send_tip(mention, to_user, from_user, amount):
                       )
         return
 
-    if tips_manager.send_tip(to_user, from_user, amount, mention.context):
+    if tips_manager.send_tip(to_user, from_user, amount, mention):
         mention.reply('Thanks {from_user}, you have sent **{amount}** TIPs to **{to_user}**.{reply_footer}'
             .format(
             to_user=to_user,
@@ -251,6 +252,19 @@ def main():
         start_process = True
     else:
         logger.error("tip bot already running! Will not start.")
+
+    try:
+        logger.info("Topping off accounts")
+        if datetime.datetime.today().weekday() == 0:
+            tips_manager.top_off_accounts()
+    except Exception as err:
+        logger.exception("Unknown Exception topping off accounts")
+        try:
+            send_email("Unknown Exception topping off accounts", "Error: {exception}".format(exception=str(err)),
+                       [DEV_EMAIL])
+            send_dev_pm("Unknown Exception topping off accounts", "Error: {exception}".format(exception=str(err)))
+        except Exception as err:
+            logger.exception("Unknown error sending dev pm or email")
 
     while start_process and os.path.isfile(RUNNING_FILE):
         logger.info("Start Main Loop")

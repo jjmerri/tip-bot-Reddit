@@ -19,6 +19,7 @@ CREATE TABLE `tip_transaction` (
   `from_acct_id` int(11) NOT NULL,
   `amount` DECIMAL(18,9) NOT NULL,
   `context` varchar(400) NOT NULL,
+  `parent_permalink` varchar(400) NOT NULL,
   `create_timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ,
   PRIMARY KEY (`trns_id`),
   FOREIGN KEY (`to_acct_id`)

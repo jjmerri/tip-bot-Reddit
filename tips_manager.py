@@ -65,13 +65,15 @@ def initialize_account(username):
         db_connection.connection.commit()
         db_connection.connection.close()
 
-def send_tip(to_user, from_user, amount, context):
+def send_tip(to_user, from_user, amount, mention):
     """
     sends a tip to to_user from from_user in the amount of amount
     :param to_user: user receiveing the tip
     :param from_user: user sending the tip
     :param amount: amount of tip being sent
+    :param mention: the mention that prompted the tip
     """
+
     if not has_sufficient_funds(from_user, amount):
         return False
 
@@ -86,8 +88,8 @@ def send_tip(to_user, from_user, amount, context):
     db_connection.cursor.execute(update_account_query, [to_account_balance + amount, to_user])
     db_connection.cursor.execute(update_account_query, [from_account_balance - amount, from_user])
 
-    tip_transaction_query = "INSERT INTO tip_transaction (to_acct_id, from_acct_id, amount, context) VALUES (%s, %s, %s, %s)"
-    db_connection.cursor.execute(tip_transaction_query, [to_account["acct_id"], from_account["acct_id"], amount, context])
+    tip_transaction_query = "INSERT INTO tip_transaction (to_acct_id, from_acct_id, amount, context, parent_permalink) VALUES (%s, %s, %s, %s, %s)"
+    db_connection.cursor.execute(tip_transaction_query, [to_account["acct_id"], from_account["acct_id"], amount, mention.context, mention.parent().permalink])
 
     db_connection.connection.commit()
     db_connection.connection.close()
@@ -140,3 +142,14 @@ def get_total_tips_received(username):
         total = result[0]['total']
 
     return total
+
+def top_off_accounts():
+    """
+    Sets account balances to the default if they are below default
+    """
+    db_connection = DbConnection()
+    update_account_query = "UPDATE account SET balance = %s WHERE balance < %s"
+    db_connection.cursor.execute(update_account_query, [INITIAL_ACCOUNT_AMOUNT, INITIAL_ACCOUNT_AMOUNT])
+
+    db_connection.connection.commit()
+    db_connection.connection.close()
