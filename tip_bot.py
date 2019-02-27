@@ -53,7 +53,7 @@ logger = logging.getLogger('tip_bot')
 logger.setLevel(logging.INFO)
 
 documentation_link = "https://github.com/jjmerri/tip-bot-reddit"
-reply_footer = '\n\n---\n\n[^Account ^Info](https://www.reddit.com/message/compose/?to={bot_username}&subject=Account%20Info&message=!ACCOUNT) ^| [^Give ^Feedback](https://www.reddit.com/message/compose/?to={DEV_USER_NAME}&subject=Feedback) ^| [^Bot ^Info]({documentation_link}) ^| [^Tip ^Developer](https://blobware-tips.firebaseapp.com)\n\n^This ^bot ^is ^maintained ^and ^hosted ^by ^{DEV_USER_NAME}.' \
+reply_footer = '\n\n---\n\n[^Account ^Info](https://www.reddit.com/message/compose/?to={bot_username}&subject=Account%20Info&message=!ACCOUNT) ^| [^Give ^Feedback](https://www.reddit.com/message/compose/?to={DEV_USER_NAME}&subject=Feedback) ^| [^Bot ^Info]({documentation_link}) ^| [^Tip ^{DEV_USER_NAME}](https://blobware-tips.firebaseapp.com)\n\n^This ^bot ^is ^maintained ^and ^hosted ^by ^{DEV_USER_NAME}.' \
     .format(
     DEV_USER_NAME=DEV_USER_NAME,
     documentation_link=documentation_link,
@@ -115,7 +115,9 @@ def check_mentions():
     for message in reddit.inbox.unread(limit=None):
         # Mark Read first in case there is an error we dont want to keep trying to process it
         message.mark_read()
+        tips_manager.initialize_account(message.author.name)
         if message.was_comment:
+            tips_manager.initialize_account(message.parent().author.name)
             process_mention(message)
         else:
             process_pm(message)
@@ -145,6 +147,10 @@ def process_mention(mention):
                       "Example:\n\n    /u/{bot_username} +2{reply_footer}".format(bot_username=bot_username, reply_footer=reply_footer))
 
 def process_account_info_command(message):
+    """
+    retreives the user's account info and sends it to the user
+    :param message: the Reddit PM containing the command
+    """
     account_balance = tips_manager.get_account_balance(message.author.name)
     total_sent = tips_manager.get_total_tips_sent(message.author.name)
     total_received = tips_manager.get_total_tips_received(message.author.name)
@@ -166,8 +172,6 @@ def process_send_tip_command(mention):
     parentcomment = mention.parent()
 
     if parentcomment and parentcomment.author and mention.author and send_tip_match and send_tip_match.group("amount"):
-        tips_manager.initialize_account(parentcomment.author.name)
-        tips_manager.initialize_account(mention.author.name)
         try_send_tip(mention, parentcomment.author.name, mention.author.name, Decimal(send_tip_match.group("amount")))
 
 
@@ -184,8 +188,8 @@ def try_send_tip(mention, to_user, from_user, amount):
                       "**Request DENIED!**{reply_footer}".format(reply_footer=reply_footer)
                       )
         return
-    elif amount < Decimal(.01):
-        mention.reply("Way to dig deep there big spender! All tips must exceed .01 TIPs. "
+    elif amount < Decimal(.1):
+        mention.reply("Way to dig deep there big spender! All tips must exceed .1 TIPs. "
                       "**Request DENIED!**{reply_footer}".format(reply_footer=reply_footer)
                       )
         return
@@ -254,8 +258,8 @@ def main():
         logger.error("tip bot already running! Will not start.")
 
     try:
-        logger.info("Topping off accounts")
         if datetime.datetime.today().weekday() == 0:
+            logger.info("Topping off accounts")
             tips_manager.top_off_accounts()
     except Exception as err:
         logger.exception("Unknown Exception topping off accounts")

@@ -7,3 +7,4 @@ tip_bot.cfg
 usdc_tip_bot.cfg
 usdc_tip_bot_prod.cfg
 *.pyc
+tip_bot_prod.cfg
