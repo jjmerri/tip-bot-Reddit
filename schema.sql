@@ -7,7 +7,7 @@ CREATE TABLE `account` (
   `username` varchar(20) NOT NULL,
   `balance` DECIMAL(18,9) NOT NULL,
   `create_timestamp` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `update_timestamp` TIMESTAMP DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `update_timestamp` TIMESTAMP NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`acct_id`),
   UNIQUE KEY(`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;

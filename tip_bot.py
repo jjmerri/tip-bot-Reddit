@@ -201,12 +201,19 @@ def try_send_tip(mention, to_user, from_user, amount):
         return
 
     if tips_manager.send_tip(to_user, from_user, amount, mention):
-        mention.reply('Thanks {from_user}, you have sent **{amount}** TIPs to **{to_user}**.{reply_footer}'
+        total_sent = tips_manager.get_total_tips_sent(from_user)
+        total_received = tips_manager.get_total_tips_received(to_user)
+        mention.reply('Thanks {from_user}, you have sent **{amount}** TIPs to **{to_user}**.\n\n'
+                      'You have sent a total of {total_sent} TIPs.\n\n'
+                      '{to_user} has received a total of {total_received} TIPs.{reply_footer}'
             .format(
-            to_user=to_user,
-            from_user=from_user,
-            amount=str(amount),
-            reply_footer=reply_footer)
+                to_user=to_user,
+                from_user=from_user,
+                amount=str(amount),
+                reply_footer=reply_footer,
+                total_sent=format(total_sent, '.2f'),
+                total_received=format(total_received, '.2f')
+            )
         )
     else:
         mention.reply('You do not have sufficient funds to send that tip. How embarrassing for you.{reply_footer}'
@@ -283,7 +290,7 @@ def main():
                 send_dev_pm("Unknown Exception in Main Loop", "Error: {exception}".format(exception=str(err)))
             except Exception as err:
                 logger.exception("Unknown error sending dev pm or email")
-        time.sleep(10)
+        time.sleep(300)
 
     logger.info("end")
 
