@@ -53,7 +53,7 @@ logger = logging.getLogger('tip_bot')
 logger.setLevel(logging.INFO)
 
 documentation_link = "https://github.com/jjmerri/tip-bot-reddit"
-reply_footer = '\n\n---\n\n[^Account ^Info](https://www.reddit.com/message/compose/?to={bot_username}&subject=Account%20Info&message=!ACCOUNT) ^| [^Give ^Feedback](https://www.reddit.com/message/compose/?to={DEV_USER_NAME}&subject=Feedback) ^| [^Bot ^Info]({documentation_link}) ^| [^Tip ^{DEV_USER_NAME}](https://blobware-tips.firebaseapp.com)\n\n^This ^bot ^is ^maintained ^and ^hosted ^by ^{DEV_USER_NAME}.' \
+reply_footer = '\n\n---\n\n[^(Account Info)](https://www.reddit.com/message/compose/?to={bot_username}&subject=Account%20Info&message=!ACCOUNT) ^| [^(Give Feedback)](https://www.reddit.com/message/compose/?to={DEV_USER_NAME}&subject=Feedback) ^| [^(Bot Info)]({documentation_link}) ^| [^(Tip {DEV_USER_NAME})](https://blobware-tips.firebaseapp.com)\n\n^(This bot is maintained and hosted by {DEV_USER_NAME}.)' \
     .format(
     DEV_USER_NAME=DEV_USER_NAME,
     documentation_link=documentation_link,
@@ -188,8 +188,8 @@ def try_send_tip(mention, to_user, from_user, amount):
                       "**Request DENIED!**{reply_footer}".format(reply_footer=reply_footer)
                       )
         return
-    elif amount < Decimal(.1):
-        mention.reply("Way to dig deep there big spender! All tips must exceed .1 TIPs. "
+    elif amount < Decimal(".1"):
+        mention.reply("Way to dig deep there big spender! All tips must be >= .1 TIPs. "
                       "**Request DENIED!**{reply_footer}".format(reply_footer=reply_footer)
                       )
         return
