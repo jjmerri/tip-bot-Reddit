@@ -142,7 +142,7 @@ def process_mention(mention):
 
     if CommandType.SEND_TIP == command:
         process_send_tip_command(mention)
-    else:
+    elif mention.parent().author.name != bot_username:
         mention.reply("I could not find a valid command in your comment. Please try again with the correct syntax.\n\n"
                       "Example:\n\n    /u/{bot_username} +2{reply_footer}".format(bot_username=bot_username, reply_footer=reply_footer))
 
